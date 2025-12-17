@@ -25,20 +25,32 @@ vim.o.mouse = 'a'
 vim.o.showmode = false
 
 -- Sync clipboard between OS and Neovim.
---  Schedule the setting after `UiEnter` because it can increase startup-time.
---  Remove this option if you want your OS clipboard to remain independent.
---  See `:help 'clipboard'`
--- clip.exe clipboard support for WSL
-vim.g.clipboard = {
-  name = 'clip.exe',
-  copy = {
-    ['+'] = '/mnt/c/WINDOWS/system32/clip.exe',
-    ['*'] = '/mnt/c/WINDOWS/system32/clip.exe',
-  },
-  cache_enabled = false,
-}
+-- Schedule after startup to avoid slowing down init.
+
+local function is_wsl()
+  local rel = (vim.fn.systemlist("uname -r")[1] or ""):lower()
+  return rel:find("microsoft") ~= nil
+end
+
 vim.schedule(function()
-  vim.o.clipboard = 'unnamedplus'
+  -- On macOS/Linux, Neovim will use pbcopy/pbpaste or xclip/xsel/wl-clipboard automatically.
+  vim.opt.clipboard = "unnamedplus"
+
+  -- WSL: use Windows clipboard via clip.exe / powershell
+  if is_wsl() and vim.fn.executable("/mnt/c/Windows/System32/clip.exe") == 1 then
+    vim.g.clipboard = {
+      name = "WslClipboard",
+      copy = {
+        ["+"] = "/mnt/c/Windows/System32/clip.exe",
+        ["*"] = "/mnt/c/Windows/System32/clip.exe",
+      },
+      paste = {
+        ["+"] = "/mnt/c/Windows/System32/powershell.exe -NoProfile -Command Get-Clipboard",
+        ["*"] = "/mnt/c/Windows/System32/powershell.exe -NoProfile -Command Get-Clipboard",
+      },
+      cache_enabled = 0,
+    }
+  end
 end)
 
 -- Enable break indent
